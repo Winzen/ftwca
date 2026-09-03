@@ -131,6 +131,32 @@ Escrevi o CSV com `ano,mes,reference_date` como colunas, além de codificar `ano
 
 **Resultado final:** cadeia completa `check_update_flow` → `flow_download_flow` → `mat_test_flow`, todas `COMPLETED`, dado certo nas duas tabelas (dev confirmado via query direta: `{ano: 2026, mes: 9, reference_date: 2026-09-03}`, tipos corretos via `safe_cast`).
 
+## Consolidação em `test_dataset/` (2026-09-02/03)
+
+Depois do teste particionado acima, ficou claro um problema de organização: `test_dataset/`, `test_event_pipeline/` e `test_event_pipeline_partitioned/` eram três pastas de topo diferentes, mas as duas últimas são só tabelas do **mesmo** `dataset_id` de sandbox (`test_dataset`) no backend — nenhuma razão pra ter `flows.py`/`tasks.py`/`constants.py` duplicados por piloto. A convenção real do repo (ver `pipelines/datasets/br_ms_sih/flows.py`: várias tabelas, um `flows.py` só) já resolvia isso.
+
+Consolidado: `test_event_pipeline/` e `test_event_pipeline_partitioned/` foram apagadas, e os dois pilotos passaram a viver dentro de `pipelines/datasets/test_dataset/` — `constants.py`/`tasks.py`/`flows.py` únicos, cada piloto numa seção com banner de comentário separando do resto (inclusive dos testes de `download_data_to_gcs` que já moravam ali).
+
+Isso expôs uma restrição nova: `deploy_flows.py` usa o **nome da variável do módulo** como nome literal do deployment (`for name, obj in vars(module).items()`), e o desenho original de `CheckThenDownloadPipeline`/`deployment_name()` assumia que esse nome era sempre `<etapa>_flow` — o que só funciona com um dataset por arquivo. Com dois pilotos no mesmo `flows.py`, as variáveis precisam de nomes próprios (`event_pipeline_check_update_flow`, `event_pipeline_partitioned_check_update_flow`, etc.), e o `check_update` de cada um precisa saber dispatchar pro `flow_download` certo — não mais o nome-padrão adivinhado.
+
+Solução: novo parâmetro `flow_download_deployment: str | None` em `CheckThenDownloadPipeline`, setado como atributo **depois** que o flow existe, a partir do `.fn.__name__` da própria função:
+
+```python
+_event_pipeline.flow_download_deployment = (
+    event_pipeline_flow_download_flow.fn.__name__
+)
+```
+
+Deliberadamente não é uma string digitada solta no construtor — isso reintroduziria o mesmo risco que `Etapa(StrEnum)` foi criado pra eliminar (duas grafias do mesmo nome podendo divergir silenciosamente). Derivar de `.fn.__name__` (não `.__name__` direto no objeto `Flow` — o `pyrefly` acusa `missing-attribute`, já que `Flow` não declara esse atributo, mesmo funcionando em runtime) garante que o nome usado no dispatch é sempre o nome real da função.
+
+Aproveitado pra também simplificar `deploy_tags`: a tag da etapa virou só o nome dela (`"check_update"`, `"flow_download"`), sem o prefixo `"etapa:"` que só poluía a tag sem agregar informação.
+
+Commit `b9f0ac5f` (branch `feat/event-pipeline-automations-poc`). Depois do commit: os 9 flows do arquivo (5 de `download_data_to_gcs` + 4 dos dois pilotos de evento) foram redeployados, os 4 deployments órfãos das pastas antigas foram removidos, e a cadeia completa foi testada de ponta a ponta de novo — dessa vez forçando dado novo de propósito (coverage de ambas as tabelas rolada pra ontem no backend) pra validar o dispatch automático com os nomes novos, não só a lógica interna:
+
+`check_update_flow` (ambos, `COMPLETED`, detectou `has_new_data=True`) → dispatch automático pro `flow_download` **pelo nome derivado de `.fn.__name__`** (`event_pipeline_flow_download_flow` / `event_pipeline_partitioned_flow_download_flow`, ambos `COMPLETED`) → dispatch automático pro `mat_test_flow` compartilhado (ambos `COMPLETED`).
+
+Confirma que a correção funciona em execução real e não só em checagem estática/unitária.
+
 ## Status
 
-Passos 1 e 2 do plano concluídos: `CheckThenDownloadPipeline` escrita, `test_event_pipeline` refatorado pra usá-la, teste ponta a ponta revalidado com sucesso — inclusive com dados particionados (`test_event_pipeline_partitioned`), 4 problemas reais encontrados e corrigidos pelo caminho (2 deles são bugs/lacunas de processo genéricos, candidatos a issue separada — ver seções 1 e 2 acima). Próximo passo (passo 3): aplicar num dataset real, ou generalizar pro `check_and_download`.
+Passos 1 e 2 do plano concluídos: `CheckThenDownloadPipeline` escrita, os dois pilotos (`event_pipeline`/`event_pipeline_partitioned`) consolidados dentro de `test_dataset/`, teste ponta a ponta revalidado com sucesso — inclusive dispatch automático com os nomes de deployment novos. 4 problemas reais encontrados e corrigidos no piloto particionado (2 deles são bugs/lacunas de processo genéricos, candidatos a issue separada — ver seções 1 e 2 acima), mais o ajuste de `flow_download_deployment` pra suportar múltiplos pilotos por arquivo. Próximo passo (passo 3): aplicar num dataset real, ou generalizar pro `check_and_download`.
