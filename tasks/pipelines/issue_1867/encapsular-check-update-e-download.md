@@ -157,6 +157,32 @@ Commit `b9f0ac5f` (branch `feat/event-pipeline-automations-poc`). Depois do comm
 
 Confirma que a correção funciona em execução real e não só em checagem estática/unitária.
 
+## Refinamentos de API e nomenclatura (2026-09-04/05)
+
+Depois da consolidação acima, uma rodada de revisão da API do `CheckThenDownloadPipeline` (perguntas diretas sobre cada escolha de nome/desenho) resultou em vários ajustes, todos sem mudar o comportamento externo da cadeia `check_update` → `download` → `mat_test`:
+
+**`upload_to_gcs` movido pra dentro da cápsula.** `download_data` (a lógica específica do dataset) fazia o upload ele mesmo, repetindo `dataset_id`/`table_id`/`bucket_name="basedosdados-dev"` em cada dataset. Como `bucket_name="basedosdados-dev"` é fixo pra essa etapa em **todos** os ~42 datasets reais que já usam esse padrão (`br_anp_precos_combustiveis/flows.py` e outros — a segunda cópia pra prod é feita depois, dentro de `transfer_files_to_prod_flow`, já genérico), o upload virou responsabilidade de `CheckThenDownloadPipeline.run_download()`. `download_data` passou a só escrever o arquivo local e devolver o caminho; `DownloadResult` ganhou `data_path` (obrigatório) e `dump_mode`/`source_format` (opcionais, com os defaults de antes) — esses dois continuam configuráveis porque variam de verdade entre datasets reais (append vs. overwrite, csv vs. parquet, confirmado por grep no repo: 50 usos de `append` vs. 41 de `overwrite`, 52 de `parquet` vs. 7 de `csv`).
+
+**`prefect_dataset_id` derivado automaticamente.** Pergunta: por que o piloto tinha uma constante `*_PREFECT_DATASET_ID` cujo valor era literalmente igual a `table_id`? Investigação na convenção real do repo (`br_bcb_agencia__agencia`, `br_denatran_frota__uf_tipo` — este último tem 2 tabelas, não 1 como presumido antes —, `br_rf_cno__{table_id}`) confirmou: o padrão universal é `f"{dataset_id}__{table_id}"`, usado **sempre**, mesmo com uma tabela só — não é um caso especial de multi-tabela. `CheckThenDownloadPipeline` agora deriva isso sozinho por padrão (`prefect_dataset_id` continua aceito como override); as constantes `*_PREFECT_DATASET_ID` do piloto saíram, redundantes.
+
+**Ordem do nome do flow invertida.** Era `f"{dataset_id}: {etapa}"`; virou `f"{etapa}: {dataset_id}"` (decisão explícita do usuário). Centralizado numa função só, `_flow_name()`, usada tanto por `deployment_name()` (resolve o `run_deployment()`) quanto por duas properties novas na classe, `check_update_flow_name`/`download_flow_name` — o `flows.py` de cada dataset passa a usar `@flow(name=_pipeline.check_update_flow_name)` em vez de montar o f-string à mão, então as duas pontas (onde o flow é declarado, onde é referenciado no dispatch) nunca divergem.
+
+**`Etapa.FLOW_DOWNLOAD` → `Etapa.DOWNLOAD`.** O método correspondente sempre foi `run_download` (nunca `run_flow_download`) — o valor `"flow_download"` era a única coisa fora desse padrão. Renomeado em todo o repo (`Etapa`, `deploy_tags`, job variables, nomes de função `event_pipeline_download_flow`, prefixo de rename do flow run) — só 4 arquivos `.py` no repo inteiro referenciavam `flow_download`.
+
+**`check_fn`/`download_fn` → `check_for_update`/`download_data`.** O sufixo `_fn` (abreviação de "function") não é usado em mais nenhum lugar do repo — foi inventado só aqui, e não descrevia o que cada callback faz. Passou por duas rodadas de refinamento com o usuário: primeiro `find_reference_date`/`download_data` (rejeitado — "não sei se gostei"), depois `check_for_update`/`download_data` (aceito). Regra prática confirmada por essa troca: nomear pelo verbo da ação (`check_for_update`, `download_data`), não por um sufixo genérico de "isso é uma função".
+
+Todas essas mudanças foram validadas com scripts (`uv run python -c "..."`) confirmando que `@flow(name=...)` real bate com o que `deployment_name()` resolve, antes de qualquer redeploy. Commit `e54a55b6` (branch `feat/event-pipeline-automations-poc`).
+
+### Reteste ponta a ponta (2026-09-05)
+
+Redeploy dos 9 flows de `pipelines/datasets/test_dataset/flows.py` no pool `basedosdados`, 5 deployments órfãos das rodadas de nomenclatura anteriores removidos (2 do piloto `event_pipeline` com nomes antigos, 2 do `event_pipeline_partitioned`, e um resquício bem mais antigo — um `mat_test_flow` duplicado, tag `etapa:mat_test`/`dataset:test_event_pipeline`, criado em 2026-08-31 na era das Automações do Prefect, nunca limpo antes).
+
+`check_update` disparado manualmente pros dois pilotos (a coverage de ambos já estava desatualizada em relação à data corrente, sem precisar forçar rollback como da última vez):
+
+`check_update` (ambos, `COMPLETED`) → `download` (ambos, `COMPLETED`, nomes `event_pipeline_download_flow`/`event_pipeline_partitioned_download_flow`) → `mat_test` (ambos, `COMPLETED` — confirmado por parâmetros reais do flow run, não só pelo nome: `0305a045-...` com `table_id=test_event_pipeline`/`partition_folders=None`, `ba4fde6b-...` com `table_id=test_event_pipeline_partitioned`/`partition_folders=['ano=2026/mes=9']`).
+
+Confirma que o refinamento de nomenclatura não teve nenhum efeito colateral no comportamento real da cadeia.
+
 ## Status
 
-Passos 1 e 2 do plano concluídos: `CheckThenDownloadPipeline` escrita, os dois pilotos (`event_pipeline`/`event_pipeline_partitioned`) consolidados dentro de `test_dataset/`, teste ponta a ponta revalidado com sucesso — inclusive dispatch automático com os nomes de deployment novos. 4 problemas reais encontrados e corrigidos no piloto particionado (2 deles são bugs/lacunas de processo genéricos, candidatos a issue separada — ver seções 1 e 2 acima), mais o ajuste de `flow_download_deployment` pra suportar múltiplos pilotos por arquivo. Próximo passo (passo 3): aplicar num dataset real, ou generalizar pro `check_and_download`.
+Passos 1 e 2 do plano concluídos: `CheckThenDownloadPipeline` escrita e refinada (upload encapsulado, nomenclatura consistente com a convenção real do repo), os dois pilotos (`event_pipeline`/`event_pipeline_partitioned`) consolidados dentro de `test_dataset/`, teste ponta a ponta revalidado com sucesso múltiplas vezes — a última em 2026-09-05, já com a API final. 4 problemas reais encontrados e corrigidos no piloto particionado (1 deles virou issue própria, #1967 — o outro, o bug do `allPoll(rawDataSource_Id: null)`, ainda sem issue separada). Próximo passo (passo 3): aplicar num dataset real (levantamento de candidatos já feito, ver `levantamento-datasets-por-categoria-de-check.md`), ou generalizar pro `check_and_download`.
