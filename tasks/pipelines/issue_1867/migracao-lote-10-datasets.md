@@ -45,6 +45,10 @@ Três gaps descobertos e **documentados, não implementados** (decisão conscien
 2. **Overrides manuais de execução** (`us_cfpb_hmda`). O flow antigo aceitava `materialize_to_prod`/`update_metadata`/`force_run` como parâmetros pra rodar só em dev, pular a materialização, ou forçar uma run mesmo sem dado novo — usado pra teste/debug manual. `CheckThenDownloadPipeline` não tem equivalente hoje.
 3. **Materialização/teste cruzado entre várias tabelas de um mesmo dataset** (`br_sfb_sicar`). `mat_test_flow` genérico assume 1 tabela por vez; não há como expressar "testa estas 9 juntas, só depois que todas terminarem de baixar".
 
+## Atualização (2026-09-14) — `br_denatran_frota` revertido
+
+Testando `check_update` de verdade contra o backend, essa migração quebrou com `IndexError` — investigação (`git merge-tree` contra `origin/main`, PR #1932) revelou que o dataset foi **renomeado em produção pra `br_senatran_estatisticas`** por dois PRs mesclados em `main` enquanto esta branch existia (`#1934`, `#1936`), sem relação com nada que fizemos aqui. O `br_senatran_estatisticas` em `main` continua no padrão monolítico antigo, ganhou uma 3ª tabela (`municipio_combustivel`) e parâmetros de override manual (`force_run`/`backfill_start`). Decisão do usuário: **ignorar por enquanto, migração de `br_denatran_frota` desfeita** (`constants.py`/`flows.py`/`tasks.py` restaurados ao estado pré-migração, deployments de teste removidos do Prefect). Detalhes completos em [[plano-de-testes-datasets-migrados]]. **10 datasets migrados nesta leva, não mais 10** — na prática ficam 9 (mais `br_ibge_ipca` = 10 no total, não 11).
+
 ## Status (2026-09-09)
 
 11 datasets migrados (`br_ibge_ipca` + os 10 desta leva), 1 bloqueado (`br_bcb_sicor`, documentado, zero código alterado). `ruff`/`pyrefly` limpos em tudo; confirmado por script que os 68 flows novos (mais os 8 do `br_ibge_ipca`) não colidem entre si nem em nome de `@flow` nem em nome de deployment. **Nada deployado, testado contra rede/backend real, commitado ou dado push** — trabalho puramente preliminar, à espera de validação real dataset por dataset.
