@@ -58,7 +58,7 @@ Disparados os 9 `check_update` reais:
 | `br_me_caged` | ✅ COMPLETED | — |
 | `br_me_comex_stat` | ✅ COMPLETED | — |
 | `us_cfpb_hmda` | ✅ COMPLETED | — |
-| `br_me_cnpj` (`socios`, `simples`) | ❌ FAILED (2x cada) | `ConnectionError`/`RemoteDisconnected` no PROPFIND contra o servidor da Receita Federal — só a partir do pod do work pool `basedosdados-dev` (testado o mesmo PROPFIND direto de outro ambiente: `HTTP 207`, resposta normal). Parece problema de rede/egress do cluster de dev, não bug de código nem da fonte. Ainda não resolvido — retomar testando de novo depois. |
+| `br_me_cnpj` (`socios`, `simples`) | ❌ FAILED (4x cada, 2 rodadas ~15min de diferença) | `ConnectionError`/`RemoteDisconnected` no PROPFIND contra o servidor da Receita Federal, reincidente nas 4 tentativas. **Origem: a fonte original** (servidor WebDAV da Receita Federal), não o cluster de dev nem o código — confirmado pelo usuário. O teste direto que respondeu `HTTP 207` daqui não foi suficiente pra descartar a fonte (rede/IP/timing diferentes o bastante pra não ser conclusivo). **Retirado dos testes desta rodada por enquanto** — retomar quando a fonte estabilizar, sem exigir mudança de código ou de infra da nossa parte. |
 | `br_denatran_frota` | ❌ FAILED | Ver seção seguinte — **não é bug, é rename real em produção**. |
 
 ### `br_denatran_frota` — achado real, migração revertida
@@ -92,7 +92,7 @@ git checkout a1895b24 -- pipelines/datasets/br_denatran_frota/
 
 1. **`br_ms_cnes`** — maior peso (13 tabelas) resolvido por 1 teste só, mesmo perfil de "código idêntico" que já funcionou no `br_ibge_ipca`. Prioridade alta por custo-benefício.
 2. **`br_ans_beneficiario`, `br_inmet_bdmep`, `us_cfpb_hmda`** — datasets de 1 tabela só, teste direto, sem decisão extra sobre "qual tabela escolher".
-3. **`br_me_cnpj`** — 2 testes: 1 tabela entre `empresas`/`socios`/`estabelecimentos` (generaliza as 3) + `simples` isolado (valida o `compare_against="table_update"`).
+3. ~~`br_me_cnpj`~~ — **pausado por enquanto**, fonte original (Receita Federal) instável nas últimas tentativas (4 falhas de conexão em 2 rodadas). Retomar quando a fonte normalizar: 2 testes, 1 tabela entre `empresas`/`socios`/`estabelecimentos` (generaliza as 3) + `simples` isolado (valida o `compare_against="table_update"`).
 4. **`br_me_caged`, `br_me_comex_stat`** — testar 1 tabela valida o check compartilhado; as demais tabelas de cada um ficam com risco residual (parsing não exercitado) até serem testadas individualmente depois.
 5. ~~`br_denatran_frota`~~ — **fora do plano**, migração revertida (dataset renomeado pra `br_senatran_estatisticas` em produção, ver acima). Retomar só depois de decidir como reconciliar com o que já existe em `main`.
 6. **`br_sfb_sicar`** — só depois da revisão humana pendente (foge do padrão, split em 2 pods nunca exercitado).
