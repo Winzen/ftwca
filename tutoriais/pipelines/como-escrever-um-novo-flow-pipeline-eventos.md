@@ -260,8 +260,42 @@ def br_ibge_ipca_mes_brasil_check_update_flow() -> None:
 
 ## Casos especiais
 
-- **Tabela `NonHistorical`** (sem coluna de data confiável, ex. `br_me_cnpj.simples`): `coverage=NonHistorical().model_dump()` + `compare_against="table_update"` no `CheckThenDownloadPipeline(...)` (ou como override na chamada de `make_pipeline(TABLE_ID, compare_against="table_update")`, se as outras tabelas do dataset usam o default).
-- **Dado particionado**: `partition_folders` no `DownloadResult`, `data_path` aponta pra pasta base (não o arquivo), mantendo a estrutura `chave=valor/` — o BigQuery detecta partição Hive sozinho a partir disso.
+### `compare_against` diferente do padrão
+
+`compare_against` decide contra o que `poll_source_for_update_task` compara a data da fonte pra saber se há dado novo: `"coverage"` (padrão, compara contra `Coverage.DateTimeRange`) ou `"table_update"` (compara contra o último `Update` commitado — necessário pra tabela **`NonHistorical`**, sem coluna de data confiável pra ter uma `Coverage.DateTimeRange` baseline, ex. `br_me_cnpj.simples`, que também precisa de `coverage=NonHistorical().model_dump()`).
+
+O override entra sempre em `flows.py` — nunca em `tasks.py`/`constants.py`, nunca em `stage_dispatch.py` (esse é o código genérico, compartilhado) — no nível mais específico que precisa dele:
+
+- **Dataset de tabela única, sem `pipeline_factory`**: direto no construtor.
+
+  ```python
+  _pipeline = CheckThenDownloadPipeline(
+      dataset_id=DATASET_ID,
+      table_id=TABLE_ID,
+      check_for_update=...,
+      download_data=...,
+      compare_against="table_update",  # <- aqui
+  )
+  ```
+
+- **Todas as tabelas de um dataset com `pipeline_factory` precisam do mesmo valor não-padrão**: fixa na fábrica.
+
+  ```python
+  make_pipeline = pipeline_factory(DATASET_ID, ..., compare_against="table_update")
+  ```
+
+- **Só uma tabela foge da regra das demais** (caso real, `br_me_cnpj.simples` — as outras 3 tabelas do dataset usam `"coverage"`): não mexe na fábrica, passa como override só naquela chamada.
+
+  ```python
+  # simples — NonHistorical, compare_against="table_update" (ver constants.py)
+  _simples_pipeline = make_pipeline(SIMPLES_TABLE_ID, compare_against=SIMPLES_COMPARE_AGAINST)
+  ```
+
+  (as demais chamadas de `make_pipeline(...)` no mesmo arquivo continuam sem o kwarg, herdando o padrão da fábrica)
+
+### Dado particionado
+
+`partition_folders` no `DownloadResult`, `data_path` aponta pra pasta base (não o arquivo), mantendo a estrutura `chave=valor/` — o BigQuery detecta partição Hive sozinho a partir disso.
 
 ## `job_variables` — dimensionar o pod
 
