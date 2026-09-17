@@ -49,6 +49,15 @@ Três gaps descobertos e **documentados, não implementados** (decisão conscien
 
 Testando `check_update` de verdade contra o backend, essa migração quebrou com `IndexError` — investigação (`git merge-tree` contra `origin/main`, PR #1932) revelou que o dataset foi **renomeado em produção pra `br_senatran_estatisticas`** por dois PRs mesclados em `main` enquanto esta branch existia (`#1934`, `#1936`), sem relação com nada que fizemos aqui. O `br_senatran_estatisticas` em `main` continua no padrão monolítico antigo, ganhou uma 3ª tabela (`municipio_combustivel`) e parâmetros de override manual (`force_run`/`backfill_start`). Decisão do usuário: **ignorar por enquanto, migração de `br_denatran_frota` desfeita** (`constants.py`/`flows.py`/`tasks.py` restaurados ao estado pré-migração, deployments de teste removidos do Prefect). Detalhes completos em [[plano-de-testes-datasets-migrados]]. **10 datasets migrados nesta leva, não mais 10** — na prática ficam 9 (mais `br_ibge_ipca` = 10 no total, não 11).
 
+## Atualização (2026-09-17) — limpeza de nome dos flows (`_flow` no final)
+
+Decisão do usuário: remover o sufixo `_flow` do nome de cada função de flow (`br_ibge_ipca_mes_brasil_check_update_flow` → `br_ibge_ipca_mes_brasil_check_update`), em todos os datasets já migrados. O nome da função é literalmente o nome do deployment no Prefect (`deploy_flows.py` descobre flows por `vars(module)`), então isso não é cosmético — qualquer redeploy sob o nome novo cria um deployment novo, deixando o antigo (`_flow`) órfão em prod e dev, o mesmo tipo de problema resolvido em [[colisao-nomes-deploy-dev-prod]] (issue #2079/#2080). O dispatch entre etapas (`stage_dispatch.py`) já é resiliente ao nome — captura via `.fn.__name__` em runtime, não hardcoded — então a troca em si é segura no código; só o lado Prefect (redeploy + limpeza dos deployments antigos) fica pendente, decisão separada de quando/como fazer.
+
+Aplicado em 8 dos 9 datasets desta leva (mais `stage_dispatch.py` e o tutorial correspondente no ftwca). **Dois ficaram de fora, por motivos diferentes:**
+
+- **`br_me_cnpj`**: removido a pedido do usuário, sem motivo registrado além de preferência — mantém `_flow` por enquanto.
+- **`br_sfb_sicar`**: removido porque ainda tem a pendência do "Desvio deliberado" (ver seção acima) em aberto — **nunca foi deployado nem testado de verdade** (a divisão em 2 pods pro download de 30h nunca foi exercitada, precisa de revisão humana antes de qualquer deploy real). Não faz sentido gerar diff/ruído de nomenclatura num código que ainda nem passou pela validação básica; a limpeza de nome fica pra quando ele for revisado e testado, junto com o resto.
+
 ## Status (2026-09-09)
 
 11 datasets migrados (`br_ibge_ipca` + os 10 desta leva), 1 bloqueado (`br_bcb_sicor`, documentado, zero código alterado). `ruff`/`pyrefly` limpos em tudo; confirmado por script que os 68 flows novos (mais os 8 do `br_ibge_ipca`) não colidem entre si nem em nome de `@flow` nem em nome de deployment. **Nada deployado, testado contra rede/backend real, commitado ou dado push** — trabalho puramente preliminar, à espera de validação real dataset por dataset.
