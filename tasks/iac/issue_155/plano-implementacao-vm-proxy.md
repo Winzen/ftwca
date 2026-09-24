@@ -14,7 +14,7 @@
 - [x] Módulo `terraform/brasil_proxy/` criado (renomeado de `compute_proxy` pra bater com a convenção dos recursos internos).
 - [x] `google_service_account` dedicada (`gsa-brasil-proxy`), sem roles de projeto amplos.
 - [x] `google_compute_instance` (`e2-small`, `southamerica-east1-a`) com `metadata_startup_script` configurando Squid + Basic Auth.
-- [x] `google_compute_address` — IP externo estático: **`35.198.19.167`**.
+- [x] `google_compute_address` — IP externo estático provisionado (não publicado aqui; ver output `brasil_proxy_ip` do Terraform ou o Secret Manager).
 - [x] `google_compute_firewall` liberando a porta 3128, sem allowlist de IP (autenticação do Squid é o controle principal, confirmado na branch [[bloqueio-ip-geografico-datasets|investigação]]).
 - [x] Senha gerada via `random_password`, salva em Secret Manager (`brasil-proxy-password`) e num arquivo local de referência (`brasil-proxy.json`, junto das outras credenciais de service account — nunca commitado).
 - [x] `terraform apply -target=module.brasil_proxy` executado com sucesso (precisou de dois imports/retries por um bug conhecido de consistência eventual do provider do Google pra `google_service_account` — resolvido com `terraform import`).

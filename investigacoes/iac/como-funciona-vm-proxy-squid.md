@@ -30,7 +30,7 @@ Documentação de referência técnica — como a peça inteira funciona hoje, p
         ┌─────────────┐                     ┌──────────────────────────────┐
         │ GCS/BigQuery │                     │   VM brasil-proxy             │
         │ Prefect API  │                     │   southamerica-east1-a        │
-        │ Vault        │                     │   IP: 35.198.19.167            │
+        │ Vault        │                     │   IP: <ip-da-vm>                │
         └─────────────┘                     │   Squid (porta 3128)           │
                                               └───────────────┬────────────────┘
                                                                │
@@ -73,7 +73,7 @@ Isso é o ponto mais importante de entender: **o Squid nunca descriptografa nada
 1. O cliente (`requests`/`httpx`, rodando no pod) manda uma requisição `CONNECT arquivos.receitafederal.gov.br:443` pro Squid, autenticada com o usuário/senha.
 2. O Squid, depois de validar a autenticação, abre uma conexão TCP crua com o destino (`arquivos.receitafederal.gov.br:443`) e simplesmente **encana bytes** entre as duas pontas — vira um túnel opaco.
 3. O handshake TLS (certificado, chaves de sessão, tudo) acontece **direto entre o cliente e o servidor da Receita Federal**, através desse túnel. O Squid só vê bytes criptografados passando, não participa da negociação TLS nem consegue ler o conteúdo.
-4. Da perspectiva da Receita Federal, a conexão TLS chegou de `35.198.19.167` (o IP da VM) — é isso que resolve o bloqueio geográfico.
+4. Da perspectiva da Receita Federal, a conexão TLS chegou do IP da VM — é isso que resolve o bloqueio geográfico.
 
 Pra HTTP puro (não é o caso de nenhuma chamada nossa hoje, mas o Squid suporta), o comportamento seria diferente: o Squid recebe a requisição já decodificada e a encaminha ele mesmo, podendo inspecionar/modificar cabeçalhos. Como tudo aqui é HTTPS, isso não se aplica.
 
@@ -86,7 +86,7 @@ Terraform (random_password)
         │
         ├─► Secret Manager (brasil-proxy-password) ── referência/backup, não é lido em runtime
         │
-        └─► montada manualmente em BRASIL_PROXY_URL = http://usuario:senha@35.198.19.167:3128
+        └─► montada manualmente em BRASIL_PROXY_URL = http://usuario:senha@<ip-da-vm>:3128
                     │
                     ▼
         kubeseal (encriptado com o cert público do sealed-secrets do cluster)
