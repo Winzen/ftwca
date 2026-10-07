@@ -1,5 +1,12 @@
 # Pipeline orientado a eventos — fluxo e nomenclatura dos flows
 
+> **Desatualizado.** Nomenclatura pré-revisão da Laura (`pipelines#1932`):
+> `download`/`mat_test` viraram `extract_and_load`/`build_and_promote`,
+> `CheckResult`/`DownloadResult` viraram `SourceInspection`/`ExtractAndLoad`,
+> `CheckThenDownloadPipeline` virou `CheckThenExtractLoadPipeline`.
+> Referência atual, verificada contra o código:
+> [guia-pratico-migrar-dataset.md](./guia-pratico-migrar-dataset.md).
+
 Referência de como a arquitetura da issue #1867 (`check_update` → `download` → `mat_test`) é encadeada de verdade no Prefect, e de onde vem cada pedaço do nome de cada flow/deployment. Complementa a documentação de desenho em `tasks/pipelines/issue_1867/` (histórico de decisões) — este arquivo é a referência do estado atual, pra consultar rápido sem reconstruir o raciocínio.
 
 Código-fonte de tudo aqui: `pipelines/utils/stage_dispatch.py` (repo `pipelines`).

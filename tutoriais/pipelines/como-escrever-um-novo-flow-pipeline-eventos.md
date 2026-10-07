@@ -1,5 +1,12 @@
 # Pipeline orientado a eventos — como escrever um novo flow
 
+> **Desatualizado.** Nomenclatura pré-revisão da Laura (`pipelines#1932`):
+> `download`/`mat_test` viraram `extract_and_load`/`build_and_promote`,
+> `check_for_update`/`download_data` viraram `get_latest_update`/
+> `extract_load_data`, `CheckThenDownloadPipeline` virou
+> `CheckThenExtractLoadPipeline`. Guia atual, verificado contra o código:
+> [guia-pratico-migrar-dataset.md](./guia-pratico-migrar-dataset.md).
+
 Passo a passo pra migrar um dataset (ou criar um novo) pro padrão `check_update → download → mat_test` da issue #1867. Complementa [[pipeline-orientado-a-eventos-fluxo-e-nomenclatura]] — aquele documento é a referência de nomenclatura/convenções (consulta rápida); este aqui é o walkthrough, com código real, pra quem tá escrevendo um flow pela primeira vez.
 
 Exemplo principal: `br_ans_beneficiario` (1 tabela, caso mais comum). Depois, a variação pra dataset com várias tabelas (`br_ibge_ipca`).
