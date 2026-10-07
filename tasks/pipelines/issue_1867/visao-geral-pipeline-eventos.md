@@ -5,6 +5,16 @@ status: Mecanismo provado de ponta a ponta em DEV e PROD reais. Documento-sínte
 atualizado: 2026-09-01
 ---
 
+> **Desatualizado em nomenclatura.** `flow_download`/`mat_test` (usados
+> nos fluxogramas e no texto abaixo) viraram `extract_and_load`/
+> `build_and_promote` na revisão de `pipelines#1932`, e o mecanismo de
+> `ExtractAndLoad.targets` decidindo promoção pra prod (fluxograma "O que
+> fica dentro do `mat_test_flow` genérico") foi removido — `promote_to_prod`
+> hoje é derivado de onde o `extract_and_load` rodou, não de um campo do
+> dataset. O mecanismo de disparo (`run_deployment()`, não Automação) já
+> estava correto aqui. Fluxograma atualizado e guia prático:
+> [guia-pratico-migrar-dataset.md](../../../tutoriais/pipelines/guia-pratico-migrar-dataset.md).
+
 # Pipeline orientado a eventos — visão geral (issue #1867)
 
 Documento-síntese pra apresentação. Consolida o raciocínio e os resultados

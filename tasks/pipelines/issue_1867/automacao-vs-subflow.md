@@ -5,6 +5,13 @@ status: DECIDIDO — mantém automações (arquitetura atual). Proposta de subfl
 atualizado: 2026-09-01
 ---
 
+> **Revertido depois.** A "decisão final" abaixo (manter Automação) foi
+> ela mesma revertida em seguida, no mesmo dia — ver
+> [run-deployment-vs-automacao.md](./run-deployment-vs-automacao.md):
+> `run_deployment()` direto acabou sendo adotado de verdade, pelo motivo
+> oposto ao concluído aqui (não escalava bem pra ~82 datasets). Mantido
+> como registro de como o raciocínio evoluiu, não como decisão vigente.
+
 # Automação (evento) vs. subflow/`run_deployment()` direto
 
 Discussão que surgiu depois de terminar o piloto: dado como a cadeia real

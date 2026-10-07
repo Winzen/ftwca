@@ -3,6 +3,13 @@
 **Status:** Em planejamento
 **Data:** 2026-08-28
 
+> **Desatualizado.** Proposta original — a implementação final mudou em
+> dois pontos: (1) nomenclatura (`flow_download`/`mat_test` viraram
+> `extract_and_load`/`build_and_promote`); (2) disparo entre etapas é
+> `run_deployment()` direto no código, não Automação do Prefect 3 +
+> `emit_event()` como descrito aqui. Guia atual e verificado:
+> [guia-pratico-migrar-dataset.md](../../../tutoriais/pipelines/guia-pratico-migrar-dataset.md).
+
 ---
 
 ## Contexto

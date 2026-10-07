@@ -3,6 +3,12 @@
 **Referência:** [[Nova arquitetura de flows — pipeline orientado a eventos]]
 **Status:** Em elaboração — 2026-08-28
 
+> **Desatualizado.** Plano original, conectando etapas por Automação do
+> Prefect 3 — na implementação final isso foi substituído por
+> `run_deployment()` direto no código, e `flow_download`/`mat_test`
+> viraram `extract_and_load`/`build_and_promote`. Guia atual e
+> verificado: [guia-pratico-migrar-dataset.md](../../../tutoriais/pipelines/guia-pratico-migrar-dataset.md).
+
 ---
 
 ## Contexto rápido

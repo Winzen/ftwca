@@ -3,6 +3,14 @@
 **Referência:** [[Plano de ação — pipeline orientado a eventos]]
 **Data:** 2026-08-28
 
+> **Desatualizado.** Descreve disparo via Automação do Prefect 3 +
+> `emit_event()`/Jinja — abandonado, hoje é `run_deployment()` direto no
+> código. Nomenclatura também mudou (`flow_download`/`mat_test` →
+> `extract_and_load`/`build_and_promote`). A variante `check_and_download`
+> descrita aqui continua sem nenhum código real, como já era o caso
+> quando este documento foi escrito. Guia atual e verificado:
+> [guia-pratico-migrar-dataset.md](../../../tutoriais/pipelines/guia-pratico-migrar-dataset.md).
+
 ---
 
 ## O que muda em relação ao flow atual
