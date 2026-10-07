@@ -257,3 +257,23 @@ O volume `gcp-sa` no deployment referencia duas keys do secret `api-development-
 Remover o item `CHATBOT_SA` da spec do volume no deployment `api-development`. O deployment é gerenciado no repositório do backend (não no IAC).
 
 ---
+
+### Avaliar upgrade do Cloud SQL (Postgres 13 — versão antiga)
+
+**Contexto:**
+Nos logs do pod `prefect-server` (2026-10-06), achamos um erro real de incompatibilidade:
+```
+sqlalchemy.exc.ProgrammingError: function date_bin(unknown, timestamp with time zone, timestamp with time zone) does not exist
+```
+`date_bin()` é uma função nativa do Postgres introduzida na versão 14 — usada pela própria Prefect 3 numa query de agregação de eventos por janela de tempo (aba "Events"/atividade da UI). Confirmado via `gcloud sql instances list`: a única instância Postgres do projeto, `basedosdados-dev-438172e0` (`us-central1`), está em **`POSTGRES_13`**. Não existe instância Cloud SQL separada no projeto `basedosdados` (prod) — tudo parece rodar da mesma instância, apesar do nome "dev".
+
+**Impacto atual:** baixo — o erro só aparece quando alguém abre a aba de eventos/atividade na UI do Prefect 3 (apareceu só 1 vez no log inteiro do pod, que só registra `WARNING`+). Não afeta o scheduler, deploy ou execução de flows.
+
+**Risco de não fazer nada:** essa incompatibilidade tende a aparecer de novo conforme mais funcionalidades do Prefect (ou de outros serviços que dependam de recursos recentes do Postgres) passem a usar sintaxe/funções mais novas — Postgres 13 atingiu fim de suporte da comunidade em novembro de 2025.
+
+**O que falta fazer:**
+- Confirmar se `basedosdados-dev-438172e0` é mesmo a única instância relevante (incluindo prod) ou se há outra fora do escopo de acesso usado nessa investigação.
+- Planejar o upgrade major do Cloud SQL (13 → pelo menos 14, idealmente uma versão mais recente ainda suportada) — upgrade de versão major do Cloud SQL geralmente exige janela de manutenção/downtime, não é algo incremental.
+- Levantar quem mais depende dessa instância antes de agendar a manutenção (é compartilhada entre múltiplos serviços, não só o Prefect 3).
+
+---
